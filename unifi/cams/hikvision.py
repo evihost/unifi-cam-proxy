@@ -98,8 +98,8 @@ class HikvisionCam(UnifiCamBase):
         substream = 1
         if stream_index != "video1":
             substream = self.substream
-
+        ip_only = self.args.ip.split(":")[0];
         return (
-            f"rtsp://{self.args.username}:{self.args.password}@{self.args.ip}:{self.args.rtspport}"
+            f"rtsp://{self.args.username}:{self.args.password}@{ip_only}:{self.args.rtspport}"
             f"/Streaming/Channels/{self.channel}0{substream}/"
         )
