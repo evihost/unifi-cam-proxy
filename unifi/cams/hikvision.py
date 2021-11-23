@@ -27,7 +27,8 @@ class HikvisionCam(UnifiCamBase):
     def add_parser(cls, parser: argparse.ArgumentParser) -> None:
         super().add_parser(parser)
         parser.add_argument("--username", "-u", required=True, help="Camera username")
-        parser.add_argument("--password", "-p", required=True, help="Camera password")
+        parser.add_argument("--password", "-p", required=True, help="Camera password")        
+        parser.add_argument("--rtspport", "-rp", default="554", help="RTSP Port")
         parser.add_argument(
             "--channel", "-c", default=1, type=int, help="Camera channel index"
         )
@@ -99,6 +100,6 @@ class HikvisionCam(UnifiCamBase):
             substream = self.substream
 
         return (
-            f"rtsp://{self.args.username}:{self.args.password}@{self.args.ip}:554"
+            f"rtsp://{self.args.username}:{self.args.password}@{self.args.ip}:{self.args.rtspport}"
             f"/Streaming/Channels/{self.channel}0{substream}/"
         )
