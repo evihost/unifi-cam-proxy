@@ -17,29 +17,22 @@ class HikvisionCam(UnifiCamBase):
         self.snapshot_dir = tempfile.mkdtemp()
         self.streams = {}
         self.cam = Client(
-            f"http://{self.args.ip}", self.args.username, self.args.password
+            f"http://{self.args.ip}:{self.args.httpport}", self.args.username, self.args.password
         )
-        self.channel = args.channel
-        self.substream = args.substream
-        self.ptz_supported = self.check_ptz_support(self.channel)
+        self.ptz_supported = self.check_ptz_support()
 
     @classmethod
     def add_parser(cls, parser: argparse.ArgumentParser) -> None:
         super().add_parser(parser)
         parser.add_argument("--username", "-u", required=True, help="Camera username")
-        parser.add_argument("--password", "-p", required=True, help="Camera password")        
+        parser.add_argument("--password", "-p", required=True, help="Camera password")
+        parser.add_argument("--httppport", "-hp", default="80", help="HTTP Port")
         parser.add_argument("--rtspport", "-rp", default="554", help="RTSP Port")
-        parser.add_argument(
-            "--channel", "-c", default=1, type=int, help="Camera channel index"
-        )
-        parser.add_argument(
-            "--substream", "-s", default=3, type=int, help="Camera substream index"
-        )
 
     async def get_snapshot(self) -> Path:
         img_file = Path(self.snapshot_dir, "screen.jpg")
-        source = int(f"{self.channel}01")
-        resp = self.cam.Streaming.channels[source].picture(
+
+        resp = self.cam.Streaming.channels[102].picture(
             method="get", type="opaque_data"
         )
         with img_file.open("wb") as f:
@@ -48,12 +41,12 @@ class HikvisionCam(UnifiCamBase):
                     f.write(chunk)
         return img_file
 
-    def check_ptz_support(self, channel) -> bool:
+    def check_ptz_support(self) -> bool:
         try:
-            self.cam.PTZCtrl.channels[channel].capabilities(method="get")
+            self.cam.PTZCtrl.channels[1].capabilities(method="get")
             self.logger.info("Detected PTZ support")
             return True
-        except (requests.exceptions.HTTPError, requests.exceptions.ConnectionError):
+        except requests.exceptions.HTTPError:
             pass
         return False
 
@@ -95,11 +88,9 @@ class HikvisionCam(UnifiCamBase):
             )
 
     def get_stream_source(self, stream_index: str) -> str:
-        substream = 1
+        channel = 1
         if stream_index != "video1":
-            substream = self.substream
-        ip_only = self.args.ip.split(":")[0]
+            channel = 3
         return (
-            f"rtsp://{self.args.username}:{self.args.password}@{ip_only}:{self.args.rtspport}"
-            f"/Streaming/Channels/{self.channel}0{substream}/"
+            f"rtsp://{self.args.username}:{self.args.password}@{self.args.ip}:{self.args.rtspport}"
         )
