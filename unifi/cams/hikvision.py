@@ -26,7 +26,7 @@ class HikvisionCam(UnifiCamBase):
         super().add_parser(parser)
         parser.add_argument("--username", "-u", required=True, help="Camera username")
         parser.add_argument("--password", "-p", required=True, help="Camera password")
-        parser.add_argument("--httppport", "-hp", default="80", help="HTTP Port")
+        parser.add_argument("--httpport", "-hp", default="80", help="HTTP Port")
         parser.add_argument("--rtspport", "-rp", default="554", help="RTSP Port")
 
     async def get_snapshot(self) -> Path:
