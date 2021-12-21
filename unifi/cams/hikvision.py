@@ -1,14 +1,20 @@
 import argparse
+import asyncio
 import logging
 import tempfile
+import threading
+import traceback
 from pathlib import Path
 from typing import Any, Dict
 
+import backoff
 import requests
+import websockets
 import xmltodict
 from hikvisionapi import Client
 
 from unifi.cams.base import UnifiCamBase
+from unifi.core import RetryableError
 
 
 class HikvisionCam(UnifiCamBase):
@@ -16,6 +22,9 @@ class HikvisionCam(UnifiCamBase):
         super().__init__(args, logger)
         self.snapshot_dir = tempfile.mkdtemp()
         self.streams = {}
+        self.motion_timeout = 5  # seconds
+        self.motion_counter = 0
+        self.loop = None
         self.cam = Client(
             f"http://{self.args.ip}:{self.args.httpport}", self.args.username, self.args.password
         )
@@ -94,3 +103,35 @@ class HikvisionCam(UnifiCamBase):
         return (
             f"rtsp://{self.args.username}:{self.args.password}@{self.args.ip}:{self.args.rtspport}"
         )
+
+    async def _trigger_motion_start(self):
+        if self.motion_counter == 0:
+            await self.trigger_motion_start()
+            print('Motion detected - recording started')
+        self.motion_counter += 1
+        self.loop.call_later(self.motion_timeout, asyncio.ensure_future, self._trigger_motion_stop())
+
+    async def _trigger_motion_stop(self):
+        self.motion_counter -= 1
+        if self.motion_counter <= 0:
+            self.motion_counter = 0
+            print('Motion ended - recording stopped')
+            await self.trigger_motion_stop()
+
+    def _worker(self):
+        while True:
+            try:
+                self.cam.count_events = 1  # The number of events we want to retrieve (default = 1)
+                response = self.cam.Event.notification.alertStream(method='get', type='stream')
+                if response:
+                    for r in response:
+                        event = r['EventNotificationAlert']
+                        if event['eventType'] == 'VMD' and event['eventDescription'] == 'Motion alarm':
+                            asyncio.run_coroutine_threadsafe(self._trigger_motion_start(), self.loop)
+            except:
+                traceback.print_exc()
+
+    async def run(self) -> None:
+        self.loop = asyncio.get_event_loop()
+        threading.Thread(target=self._worker, daemon=True).start()
+
