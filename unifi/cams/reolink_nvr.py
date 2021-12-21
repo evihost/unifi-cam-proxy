@@ -1,6 +1,4 @@
-import argparse
 import json
-import logging
 import tempfile
 from pathlib import Path
 
@@ -11,19 +9,19 @@ from unifi.cams.base import UnifiCamBase
 
 
 class ReolinkNVRCam(UnifiCamBase):
-    def __init__(self, args: argparse.Namespace, logger: logging.Logger) -> None:
-        super().__init__(args, logger)
-        self.snapshot_dir: str = tempfile.mkdtemp()
-        self.motion_in_progress: bool = False
-
     @classmethod
-    def add_parser(cls, parser: argparse.ArgumentParser) -> None:
-        super().add_parser(parser)
+    def add_parser(self, parser):
+        super(ReolinkNVRCam, self).add_parser(parser)
         parser.add_argument("--username", "-u", required=True, help="NVR username")
         parser.add_argument("--password", "-p", required=True, help="NVR password")
         parser.add_argument("--channel", "-c", required=True, help="NVR camera channel")
 
-    async def get_snapshot(self) -> Path:
+    def __init__(self, args, logger=None):
+        super().__init__(args, logger)
+        self.snapshot_dir = tempfile.mkdtemp()
+        self.motion_in_progress = False
+
+    async def get_snapshot(self):
         img_file = Path(self.snapshot_dir, "screen.jpg")
         url = (
             f"http://{self.args.ip}"
@@ -33,7 +31,7 @@ class ReolinkNVRCam(UnifiCamBase):
         await self.fetch_to_file(url, img_file)
         return img_file
 
-    async def run(self) -> None:
+    async def run(self):
         url = (
             f"http://{self.args.ip}"
             f"/api.cgi?user={self.args.username}&password={self.args.password}"
@@ -84,7 +82,7 @@ class ReolinkNVRCam(UnifiCamBase):
             except aiohttp.ClientError as err:
                 self.logger.error(f"Motion API request failed, retrying. Error: {err}")
 
-    def get_stream_source(self, stream_index: str) -> str:
+    def get_stream_source(self, stream_index: str):
         return (
             f"rtsp://{self.args.username}:{self.args.password}@{self.args.ip}:554"
             f"/h264Preview_{int(self.args.channel) + 1:02}_main"
